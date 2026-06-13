@@ -1,0 +1,32 @@
+# Dépendances
+node_modules/
+
+# Builds frontend
+frontend/dist/
+frontend/dist-ssr/
+
+# Backend — secrets & données locales
+backend/.env
+backend/data/journal.db
+backend/data/journal.db-wal
+backend/data/journal.db-shm
+backend/data/avatars/
+backend/data/store.json
+backend/data/store.json.bak
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS / éditeur
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Environnement (racine, si ajouté plus tard)
+.env
+.env.*
+!.env.example
