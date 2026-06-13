@@ -7,6 +7,7 @@ const authStore = useAuthStore()
 const fileInput = ref(null)
 
 const profileForm = ref({
+  username: '',
   name: '',
   email: '',
 })
@@ -33,6 +34,7 @@ onMounted(() => {
 function loadProfile() {
   if (!authStore.user) return
   profileForm.value = {
+    username: authStore.user.username || '',
     name: authStore.user.name || '',
     email: authStore.user.email || '',
   }
@@ -44,9 +46,11 @@ async function saveProfile() {
   savingProfile.value = true
   try {
     await authStore.updateProfile({
+      username: profileForm.value.username,
       name: profileForm.value.name,
       email: profileForm.value.email,
     })
+    loadProfile()
     profileMessage.value = 'Profil mis à jour.'
   } catch (e) {
     profileError.value = e.response?.data?.error || 'Erreur lors de la mise à jour.'
@@ -116,7 +120,7 @@ async function removeAvatar() {
   <div class="page p-4 sm:p-6 lg:p-8 max-w-xl mx-auto w-full">
     <header class="mb-6 sm:mb-8">
       <h2 class="text-xl sm:text-2xl font-semibold tracking-tight">Profil</h2>
-      <p class="text-text-muted text-sm mt-1">Photo, nom, email et mot de passe</p>
+      <p class="text-text-muted text-sm mt-1">Photo, identifiant, email et mot de passe</p>
     </header>
 
     <section class="panel p-4 sm:p-6 mb-6">
@@ -160,12 +164,16 @@ async function removeAvatar() {
       <div>
         <label class="field-label">Nom d'utilisateur</label>
         <input
-          :value="authStore.user?.username"
+          v-model="profileForm.username"
           type="text"
-          class="field-input opacity-70"
-          disabled
+          class="field-input"
+          autocomplete="username"
+          pattern="[a-zA-Z0-9_]{3,20}"
+          minlength="3"
+          maxlength="20"
+          required
         />
-        <p class="text-xs text-text-muted mt-1">Le nom d'utilisateur ne peut pas être modifié.</p>
+        <p class="text-xs text-text-muted mt-1">3 à 20 caractères : lettres, chiffres et _ (sans espaces).</p>
       </div>
 
       <div>
@@ -268,10 +276,6 @@ async function removeAvatar() {
 
 .field-input:focus {
   border-color: var(--color-accent);
-}
-
-.field-input:disabled {
-  cursor: not-allowed;
 }
 
 .btn-primary {

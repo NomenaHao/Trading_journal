@@ -4,10 +4,16 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
 import db, { formatUser, getUserById } from '../db.js';
-import { authRequired } from '../middleware/auth.js';
+import { authRequired, signToken } from '../middleware/auth.js';
 
 const router = Router();
 router.use(authRequired);
+
+const USERNAME_REGEX = /^[a-z0-9_]{3,20}$/;
+
+function normalizeUsername(username) {
+  return username?.trim().toLowerCase() || '';
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const avatarsDir = path.join(__dirname, '..', '..', 'data', 'avatars');
@@ -24,15 +30,42 @@ router.get('/', (req, res) => {
 });
 
 router.put('/', (req, res) => {
-  const { name, email } = req.body;
+  const { name, email, username } = req.body;
 
   if (!name?.trim()) {
     return res.status(400).json({ error: 'Le nom est requis.' });
   }
 
+  if (!username?.trim()) {
+    return res.status(400).json({ error: 'Le nom d\'utilisateur est requis.' });
+  }
+
+  const normalizedUsername = normalizeUsername(username);
+  if (!USERNAME_REGEX.test(normalizedUsername)) {
+    return res.status(400).json({
+      error: 'Le nom d\'utilisateur doit contenir 3 à 20 caractères (lettres, chiffres, _).',
+    });
+  }
+
   const normalizedEmail = email?.trim().toLowerCase() || '';
   if (normalizedEmail && !EMAIL_REGEX.test(normalizedEmail)) {
     return res.status(400).json({ error: 'Adresse email invalide.' });
+  }
+
+  const current = db.prepare('SELECT username FROM users WHERE id = ?').get(req.user.userId);
+  if (!current) {
+    return res.status(404).json({ error: 'Utilisateur introuvable.' });
+  }
+
+  const usernameChanged = current.username !== normalizedUsername;
+
+  if (usernameChanged) {
+    const existingUsername = db.prepare(`
+      SELECT id FROM users WHERE username = ? AND id != ?
+    `).get(normalizedUsername, req.user.userId);
+    if (existingUsername) {
+      return res.status(409).json({ error: 'Ce nom d\'utilisateur est déjà utilisé.' });
+    }
   }
 
   if (normalizedEmail) {
@@ -45,11 +78,17 @@ router.put('/', (req, res) => {
   }
 
   db.prepare(`
-    UPDATE users SET name = ?, email = ? WHERE id = ?
-  `).run(name.trim(), normalizedEmail, req.user.userId);
+    UPDATE users SET name = ?, email = ?, username = ? WHERE id = ?
+  `).run(name.trim(), normalizedEmail, normalizedUsername, req.user.userId);
 
   const user = getUserById(req.user.userId);
-  res.json(formatUser(user));
+  const payload = formatUser(user);
+
+  if (usernameChanged) {
+    return res.json({ ...payload, token: signToken(user) });
+  }
+
+  res.json(payload);
 });
 
 router.put('/password', (req, res) => {

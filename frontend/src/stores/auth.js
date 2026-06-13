@@ -81,8 +81,13 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function updateProfile(payload) {
     const { data } = await api.put('/profile', payload)
-    setUser(data)
-    return data
+    const { token: newToken, ...userData } = data
+    if (newToken) {
+      token.value = newToken
+      localStorage.setItem('token', newToken)
+    }
+    setUser(userData)
+    return userData
   }
 
   async function uploadAvatar(file) {
