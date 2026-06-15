@@ -347,14 +347,31 @@ function migrateToTradingAccounts() {
 
 migrateToTradingAccounts();
 
+function migrateBalanceCurrency() {
+  const cols = db.prepare('PRAGMA table_info(trading_accounts)').all();
+  if (!cols.some((c) => c.name === 'balance_currency')) {
+    db.exec(`ALTER TABLE trading_accounts ADD COLUMN balance_currency TEXT NOT NULL DEFAULT 'usd'`);
+    console.log('Migration : devise du compte (USD/USC) ajoutée.');
+  }
+}
+
+migrateBalanceCurrency();
+
+export function resolveBalanceCurrency(accountType, balanceCurrency) {
+  if (accountType !== 'real') return 'usd';
+  return balanceCurrency === 'usc' ? 'usc' : 'usd';
+}
+
 export function formatTradingAccount(row) {
+  const accountType = row.account_type || 'demo';
   return {
     id: row.id,
     name: row.name,
     accountId: row.account_id,
     broker: row.broker,
     brokerServer: row.broker_server || '',
-    accountType: row.account_type || 'demo',
+    accountType,
+    balanceCurrency: resolveBalanceCurrency(accountType, row.balance_currency),
     startingCapital: row.starting_capital,
     riskPerTrade: row.risk_per_trade,
     currencyPairs: JSON.parse(row.currency_pairs),
@@ -369,18 +386,20 @@ export function createDefaultTradingAccount(userId, legacy = null) {
     ? [legacy.broker, legacy.account_id].filter(Boolean).join(' #') || 'Compte principal'
     : 'Compte principal';
 
+  const accountType = legacy?.account_type || 'demo';
   const result = db.prepare(`
     INSERT INTO trading_accounts (
-      user_id, name, account_id, broker, broker_server, account_type,
+      user_id, name, account_id, broker, broker_server, account_type, balance_currency,
       starting_capital, risk_per_trade, currency_pairs, daily_goal, monthly_goal, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     userId,
     name,
     legacy?.account_id?.trim() || `compte-${userId}`,
     legacy?.broker || '',
     legacy?.broker_server || '',
-    legacy?.account_type || 'demo',
+    accountType,
+    resolveBalanceCurrency(accountType, legacy?.balance_currency),
     legacy?.starting_capital ?? 1000,
     legacy?.risk_per_trade ?? 5,
     legacy?.currency_pairs ?? '["EUR/USD","GBP/USD","USD/JPY"]',

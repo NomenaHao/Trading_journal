@@ -3,6 +3,7 @@ import db, {
   formatTradingAccount,
   getActiveTradingAccountRow,
   accountIdExistsForUser,
+  resolveBalanceCurrency,
 } from '../db.js';
 import { authRequired } from '../middleware/auth.js';
 
@@ -38,6 +39,7 @@ router.post('/', (req, res) => {
     broker,
     brokerServer,
     accountType,
+    balanceCurrency,
     startingCapital,
     riskPerTrade,
     currencyPairs,
@@ -56,12 +58,13 @@ router.post('/', (req, res) => {
   }
 
   const type = accountType === 'real' ? 'real' : 'demo';
+  const currency = resolveBalanceCurrency(type, balanceCurrency);
 
   const result = db.prepare(`
     INSERT INTO trading_accounts (
-      user_id, name, account_id, broker, broker_server, account_type,
+      user_id, name, account_id, broker, broker_server, account_type, balance_currency,
       starting_capital, risk_per_trade, currency_pairs, daily_goal, monthly_goal, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
   `).run(
     userId,
     name.trim(),
@@ -69,6 +72,7 @@ router.post('/', (req, res) => {
     broker?.trim() || '',
     brokerServer?.trim() || '',
     type,
+    currency,
     startingCapital ?? 1000,
     riskPerTrade ?? 5,
     JSON.stringify(currencyPairs?.length ? currencyPairs : ['EUR/USD']),
@@ -104,6 +108,7 @@ router.put('/:id', (req, res) => {
     broker,
     brokerServer,
     accountType,
+    balanceCurrency,
     startingCapital,
     riskPerTrade,
     currencyPairs,
@@ -132,6 +137,7 @@ router.put('/:id', (req, res) => {
   }
 
   const type = accountType === 'real' ? 'real' : 'demo';
+  const currency = resolveBalanceCurrency(type, balanceCurrency);
 
   db.prepare(`
     UPDATE trading_accounts SET
@@ -140,6 +146,7 @@ router.put('/:id', (req, res) => {
       broker = ?,
       broker_server = ?,
       account_type = ?,
+      balance_currency = ?,
       starting_capital = ?,
       risk_per_trade = ?,
       currency_pairs = ?,
@@ -153,6 +160,7 @@ router.put('/:id', (req, res) => {
     broker?.trim() || '',
     brokerServer?.trim() || '',
     type,
+    currency,
     startingCapital,
     riskPerTrade,
     JSON.stringify(currencyPairs),

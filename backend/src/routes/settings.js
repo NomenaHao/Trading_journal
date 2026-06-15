@@ -1,5 +1,10 @@
 import { Router } from 'express';
-import db, { formatTradingAccount, getActiveTradingAccountRow, accountIdExistsForUser } from '../db.js';
+import db, {
+  formatTradingAccount,
+  getActiveTradingAccountRow,
+  accountIdExistsForUser,
+  resolveBalanceCurrency,
+} from '../db.js';
 import { authRequired } from '../middleware/auth.js';
 
 const router = Router();
@@ -24,6 +29,7 @@ router.put('/', (req, res) => {
     broker,
     brokerServer,
     accountType,
+    balanceCurrency,
   } = req.body;
 
   if (!name?.trim()) {
@@ -47,6 +53,7 @@ router.put('/', (req, res) => {
   }
 
   const type = accountType === 'real' ? 'real' : 'demo';
+  const currency = resolveBalanceCurrency(type, balanceCurrency);
 
   db.prepare(`
     UPDATE trading_accounts SET
@@ -60,6 +67,7 @@ router.put('/', (req, res) => {
       broker = ?,
       broker_server = ?,
       account_type = ?,
+      balance_currency = ?,
       updated_at = datetime('now')
     WHERE id = ? AND user_id = ?
   `).run(
@@ -73,6 +81,7 @@ router.put('/', (req, res) => {
     broker || '',
     brokerServer || '',
     type,
+    currency,
     row.id,
     userId
   );
