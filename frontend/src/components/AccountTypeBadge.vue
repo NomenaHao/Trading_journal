@@ -5,6 +5,10 @@ defineProps({
     default: 'demo',
     validator: (v) => ['demo', 'real'].includes(v),
   },
+  balanceCurrency: {
+    type: String,
+    default: 'usd',
+  },
 })
 </script>
 
@@ -13,7 +17,7 @@ defineProps({
     class="account-badge"
     :class="type === 'real' ? 'account-badge-real' : 'account-badge-demo'"
   >
-    {{ type === 'real' ? 'Réel' : 'Démo' }}
+    {{ type === 'real' ? (balanceCurrency === 'usc' ? 'Réel · Cent' : 'Réel') : 'Démo' }}
   </span>
 </template>
 

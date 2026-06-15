@@ -1,9 +1,11 @@
 <script setup>
 import { ref, watch } from 'vue'
+import { currencyLabel } from '../utils/currency'
 
 const props = defineProps({
   trade: { type: Object, required: true },
   pairs: { type: Array, default: () => [] },
+  currency: { type: String, default: 'usd' },
 })
 
 const emit = defineEmits(['close', 'save'])
@@ -72,7 +74,7 @@ function validateCoherence() {
   } else if (outcome === 'SL' && pnl >= 0) {
     warning.value = 'Un trade SL devrait avoir une perte négative.'
   } else if (outcome === 'BE' && Math.abs(pnl) > 1) {
-    warning.value = 'Un break-even est généralement proche de 0 USD.'
+    warning.value = `Un break-even est généralement proche de 0 ${currencyLabel(props.currency)}.`
   }
 }
 
@@ -145,7 +147,7 @@ async function submit() {
             <input v-model.number="form.positionCount" type="number" min="1" class="field-input" required />
           </div>
           <div>
-            <label class="field-label">Résultat (USD)</label>
+            <label class="field-label">Résultat ({{ currencyLabel(currency) }})</label>
             <input
               v-model="form.profitLoss"
               type="text"

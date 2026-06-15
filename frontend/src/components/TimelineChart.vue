@@ -3,12 +3,19 @@ import { computed } from 'vue'
 
 const props = defineProps({
   data: { type: Array, default: () => [] },
+  currency: { type: String, default: 'usd' },
 })
 
 const maxAbs = computed(() => {
   if (!props.data.length) return 1
   return Math.max(...props.data.map((d) => Math.abs(d.pnl)), 1)
 })
+
+function tooltipLabel(point) {
+  const sign = point.pnl >= 0 ? '+' : ''
+  const label = props.currency === 'usc' ? 'USC' : 'USD'
+  return `${point.label}: ${sign}${point.pnl} ${label}`
+}
 </script>
 
 <template>
@@ -23,7 +30,7 @@ const maxAbs = computed(() => {
           class="w-full max-w-10 rounded-t transition-all"
           :class="point.pnl >= 0 ? 'bg-profit/70' : 'bg-loss/70'"
           :style="{ height: `${(Math.abs(point.pnl) / maxAbs) * 100}%`, minHeight: point.pnl !== 0 ? '4px' : '2px' }"
-          :title="`${point.label}: ${point.pnl >= 0 ? '+' : ''}${point.pnl} USD`"
+          :title="tooltipLabel(point)"
         />
       </div>
       <span class="text-[10px] text-text-muted truncate w-full text-center">{{ point.label }}</span>

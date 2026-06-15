@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useTradesStore } from '../stores/trades'
 import { useSettingsStore } from '../stores/settings'
@@ -11,6 +11,8 @@ const tradesStore = useTradesStore()
 const settingsStore = useSettingsStore()
 const filterPair = ref('')
 const editingTrade = ref(null)
+
+const balanceCurrency = computed(() => settingsStore.settings?.balanceCurrency || 'usd')
 
 onMounted(async () => {
   await settingsStore.fetchSettings()
@@ -104,7 +106,7 @@ function formatDateShort(iso) {
               <p class="text-xs text-text-muted mt-0.5">{{ formatDateShort(trade.closedAt) }}</p>
             </div>
             <div class="text-right shrink-0">
-              <PnlValue :value="trade.profitLoss" />
+              <PnlValue :value="trade.profitLoss" :currency="balanceCurrency" show-usd-equivalent />
               <div class="mt-1"><OutcomeBadge :outcome="trade.outcome" /></div>
             </div>
           </div>
@@ -189,7 +191,9 @@ function formatDateShort(iso) {
                   <span v-if="trade.notes" class="line-clamp-2 whitespace-pre-wrap" :title="trade.notes">{{ trade.notes }}</span>
                   <span v-else class="text-text-muted/50">—</span>
                 </td>
-                <td class="px-4 lg:px-5 py-4 text-right"><PnlValue :value="trade.profitLoss" /></td>
+                <td class="px-4 lg:px-5 py-4 text-right">
+                  <PnlValue :value="trade.profitLoss" :currency="balanceCurrency" show-usd-equivalent />
+                </td>
                 <td class="px-4 lg:px-5 py-4">
                   <div class="flex items-center justify-end gap-2">
                     <button type="button" class="action-btn" @click="openEdit(trade)">Modifier</button>
@@ -217,6 +221,7 @@ function formatDateShort(iso) {
       v-if="editingTrade"
       :trade="editingTrade"
       :pairs="settingsStore.settings?.currencyPairs || []"
+      :currency="balanceCurrency"
       @close="closeEdit"
       @save="saveEdit"
     />

@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTradesStore } from '../stores/trades'
 import { useSettingsStore } from '../stores/settings'
+import { currencyLabel, formatMoney } from '../utils/currency'
 
 const router = useRouter()
 const tradesStore = useTradesStore()
@@ -37,6 +38,9 @@ function syncPairFromSettings() {
 
 watch(() => settingsStore.activeAccountId, syncPairFromSettings)
 
+const balanceCurrency = computed(() => settingsStore.settings?.balanceCurrency || 'usd')
+const curLabel = computed(() => currencyLabel(balanceCurrency.value))
+
 const riskAmount = computed(() => {
   if (!settingsStore.settings) return null
   return (settingsStore.settings.startingCapital * settingsStore.settings.riskPerTrade) / 100
@@ -60,11 +64,11 @@ function validateCoherence() {
   } else if (outcome === 'SL' && pnl >= 0) {
     warning.value = 'Un trade SL devrait avoir une perte négative.'
   } else if (outcome === 'BE' && Math.abs(pnl) > 1) {
-    warning.value = 'Un break-even est généralement proche de 0 USD.'
+    warning.value = `Un break-even est généralement proche de 0 ${curLabel.value}.`
   }
 
   if (riskAmount.value && outcome === 'SL' && Math.abs(pnl) > riskAmount.value * 1.5) {
-    warning.value = `Perte supérieure au risque prévu (${riskAmount.value.toFixed(2)} USD).`
+    warning.value = `Perte supérieure au risque prévu (${formatMoney(riskAmount.value, balanceCurrency.value, { showSign: false })}).`
   }
 }
 
@@ -147,7 +151,7 @@ function selectOutcome(outcome) {
           <input v-model.number="form.positionCount" type="number" min="1" class="field-input" required />
         </div>
         <div>
-          <label class="field-label">Résultat (USD)</label>
+          <label class="field-label">Résultat ({{ curLabel }})</label>
           <input
             v-model="form.profitLoss"
             type="text"

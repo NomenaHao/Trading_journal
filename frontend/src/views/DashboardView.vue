@@ -1,11 +1,12 @@
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, computed, onMounted } from 'vue'
 import { useTradesStore } from '../stores/trades'
 import { useSettingsStore } from '../stores/settings'
 import PeriodTabs from '../components/PeriodTabs.vue'
 import StatCard from '../components/StatCard.vue'
 import TimelineChart from '../components/TimelineChart.vue'
 import AccountTypeBadge from '../components/AccountTypeBadge.vue'
+import { formatMoney, formatUsdEquivalent } from '../utils/currency'
 
 const tradesStore = useTradesStore()
 const settingsStore = useSettingsStore()
@@ -34,6 +35,44 @@ watch(timelinePeriod, (p) => tradesStore.fetchTimeline(p))
 watch(() => settingsStore.activeAccountId, () => load())
 
 onMounted(load)
+
+const balanceCurrency = computed(() => settingsStore.settings?.balanceCurrency || 'usd')
+
+function withUsdSub(value, showSign = true) {
+  const usd = formatUsdEquivalent(value, balanceCurrency.value, { showSign })
+  return usd ? `≈ ${usd}` : ''
+}
+
+const pnlCard = computed(() => {
+  if (!tradesStore.performance) return { value: '', sub: '' }
+  const { totalPnL } = tradesStore.performance
+  return {
+    value: formatMoney(totalPnL, balanceCurrency.value),
+    sub: withUsdSub(totalPnL),
+  }
+})
+
+const capitalCard = computed(() => {
+  if (!tradesStore.performance) return { value: '', sub: '' }
+  const { currentCapital, startingCapital } = tradesStore.performance
+  const start = formatMoney(startingCapital, balanceCurrency.value, { showSign: false })
+  const usdStart = formatUsdEquivalent(startingCapital, balanceCurrency.value, { showSign: false })
+  const startSub = usdStart ? `${start} · ≈ ${usdStart}` : start
+  return {
+    value: formatMoney(currentCapital, balanceCurrency.value, { showSign: false }),
+    sub: `Départ : ${startSub}${withUsdSub(currentCapital) ? ` · ${withUsdSub(currentCapital)}` : ''}`,
+  }
+})
+
+const goalCardSub = computed(() => {
+  if (!tradesStore.performance || tradesStore.performance.goal == null) {
+    return 'Période en cours'
+  }
+  const goal = formatMoney(tradesStore.performance.goal, balanceCurrency.value, { showSign: false })
+  const usd = formatUsdEquivalent(tradesStore.performance.goal, balanceCurrency.value, { showSign: false })
+  const goalLabel = usd ? `${goal} (≈ ${usd})` : goal
+  return `Objectif : ${goalLabel} (${tradesStore.performance.goalProgress}%)`
+})
 </script>
 
 <template>
@@ -44,6 +83,7 @@ onMounted(load)
         <AccountTypeBadge
           v-if="settingsStore.settings"
           :type="settingsStore.settings.accountType || 'demo'"
+          :balance-currency="settingsStore.settings.balanceCurrency || 'usd'"
         />
       </div>
       <p class="text-text-muted text-sm mt-1">
@@ -63,13 +103,14 @@ onMounted(load)
     <div v-if="tradesStore.performance" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
       <StatCard
         label="P&L période"
-        :value="`${tradesStore.performance.totalPnL >= 0 ? '+' : ''}${tradesStore.performance.totalPnL} USD`"
+        :value="pnlCard.value"
+        :sub="pnlCard.sub"
         :variant="tradesStore.performance.totalPnL >= 0 ? 'profit' : 'loss'"
       />
       <StatCard
         label="Capital actuel"
-        :value="`${tradesStore.performance.currentCapital} USD`"
-        :sub="`Départ : ${tradesStore.performance.startingCapital} USD`"
+        :value="capitalCard.value"
+        :sub="capitalCard.sub"
         variant="accent"
       />
       <StatCard
@@ -80,9 +121,7 @@ onMounted(load)
       <StatCard
         label="Trades"
         :value="tradesStore.performance.tradeCount"
-        :sub="tradesStore.performance.goal != null
-          ? `Objectif : ${tradesStore.performance.goal} USD (${tradesStore.performance.goalProgress}%)`
-          : 'Période en cours'"
+        :sub="goalCardSub"
       />
     </div>
 
@@ -100,7 +139,7 @@ onMounted(load)
             <option value="year">Par année</option>
           </select>
         </div>
-        <TimelineChart :data="tradesStore.timeline" />
+        <TimelineChart :data="tradesStore.timeline" :currency="balanceCurrency" />
       </div>
 
       <div class="panel p-4 sm:p-6">
@@ -126,7 +165,10 @@ onMounted(load)
                 class="text-sm font-medium tabular-nums"
                 :class="stat.netPnL >= 0 ? 'text-profit' : 'text-loss'"
               >
-                {{ stat.netPnL >= 0 ? '+' : '' }}{{ stat.netPnL }} USD
+                {{ formatMoney(stat.netPnL, balanceCurrency) }}
+              </p>
+              <p v-if="withUsdSub(stat.netPnL)" class="text-xs text-text-muted">
+                {{ withUsdSub(stat.netPnL) }}
               </p>
               <p class="text-xs text-text-muted">{{ stat.winRate }}% win</p>
             </div>

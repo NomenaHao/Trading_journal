@@ -52,6 +52,7 @@ function labelFor(account) {
       <AccountTypeBadge
         v-if="settingsStore.settings"
         :type="settingsStore.settings.accountType || 'demo'"
+        :balance-currency="settingsStore.settings.balanceCurrency || 'usd'"
         class="switcher-badge"
       />
       <span class="switcher-chevron text-text-muted">▾</span>
@@ -70,7 +71,10 @@ function labelFor(account) {
           <span class="block text-sm font-medium truncate">{{ labelFor(account) }}</span>
           <span v-if="account.accountId" class="block text-xs text-text-muted truncate">ID {{ account.accountId }}</span>
         </span>
-        <AccountTypeBadge :type="account.accountType || 'demo'" />
+        <AccountTypeBadge
+          :type="account.accountType || 'demo'"
+          :balance-currency="account.balanceCurrency || 'usd'"
+        />
       </button>
       <RouterLink
         to="/parametres"

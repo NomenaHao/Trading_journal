@@ -1,8 +1,9 @@
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, computed, onMounted } from 'vue'
 import { useSettingsStore } from '../stores/settings'
 import { useTradesStore } from '../stores/trades'
 import AccountTypeBadge from '../components/AccountTypeBadge.vue'
+import { currencyLabel, formatMoney, formatUsdEquivalent } from '../utils/currency'
 
 const settingsStore = useSettingsStore()
 const tradesStore = useTradesStore()
@@ -26,12 +27,31 @@ function emptyForm() {
     broker: '',
     brokerServer: '',
     accountType: 'demo',
+    balanceCurrency: 'usd',
   }
 }
 
+const effectiveCurrency = computed(() => {
+  if (form.value.accountType === 'real' && form.value.balanceCurrency === 'usc') return 'usc'
+  return 'usd'
+})
+
+const curLabel = computed(() => currencyLabel(effectiveCurrency.value))
+
+const riskAmountLabel = computed(() => {
+  if (!form.value.startingCapital || !form.value.riskPerTrade) return ''
+  const amount = (form.value.startingCapital * form.value.riskPerTrade) / 100
+  const primary = formatMoney(amount, effectiveCurrency.value, { showSign: false })
+  const usd = formatUsdEquivalent(amount, effectiveCurrency.value, { showSign: false })
+  return usd ? `${primary} (≈ ${usd})` : primary
+})
+
 function loadFormFromSettings() {
   if (settingsStore.settings) {
-    form.value = { ...settingsStore.settings }
+    form.value = {
+      ...settingsStore.settings,
+      balanceCurrency: settingsStore.settings.balanceCurrency || 'usd',
+    }
   }
 }
 
@@ -43,6 +63,10 @@ onMounted(async () => {
 watch(() => settingsStore.activeAccountId, () => {
   loadFormFromSettings()
   formError.value = ''
+})
+
+watch(() => form.value.accountType, (type) => {
+  if (type === 'demo') form.value.balanceCurrency = 'usd'
 })
 
 function addPair() {
@@ -89,6 +113,7 @@ async function createAccount() {
       broker: form.value.broker,
       brokerServer: form.value.brokerServer,
       accountType: form.value.accountType,
+      balanceCurrency: form.value.balanceCurrency,
       startingCapital: form.value.startingCapital,
       riskPerTrade: form.value.riskPerTrade,
       currencyPairs: [...form.value.currencyPairs],
@@ -152,7 +177,10 @@ async function removeAccount(id) {
               <span class="block text-sm font-medium truncate">{{ account.name }}</span>
               <span class="block text-xs text-text-muted truncate">ID {{ account.accountId }}</span>
             </span>
-            <AccountTypeBadge :type="account.accountType || 'demo'" />
+            <AccountTypeBadge
+              :type="account.accountType || 'demo'"
+              :balance-currency="account.balanceCurrency || 'usd'"
+            />
           </button>
           <button
             v-if="settingsStore.accounts.length > 1"
@@ -193,7 +221,7 @@ async function removeAccount(id) {
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label class="field-label">Capital de départ (USD)</label>
+          <label class="field-label">Capital de départ ({{ curLabel }})</label>
           <input v-model.number="form.startingCapital" type="number" min="0" step="any" class="field-input" required />
         </div>
         <div>
@@ -203,16 +231,16 @@ async function removeAccount(id) {
       </div>
 
       <p v-if="form.startingCapital && form.riskPerTrade" class="text-xs text-text-muted -mt-2">
-        Risque max par trade : {{ ((form.startingCapital * form.riskPerTrade) / 100).toFixed(2) }} USD
+        Risque max par trade : {{ riskAmountLabel }}
       </p>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label class="field-label">Objectif journalier (USD)</label>
+          <label class="field-label">Objectif journalier ({{ curLabel }})</label>
           <input v-model.number="form.dailyGoal" type="number" step="any" class="field-input" required />
         </div>
         <div>
-          <label class="field-label">Objectif mensuel (USD)</label>
+          <label class="field-label">Objectif mensuel ({{ curLabel }})</label>
           <input v-model.number="form.monthlyGoal" type="number" step="any" class="field-input" required />
         </div>
       </div>
@@ -239,6 +267,33 @@ async function removeAccount(id) {
             <span class="text-xs text-text-muted mt-2">Compte réel</span>
           </button>
         </div>
+      </div>
+
+      <div v-if="form.accountType === 'real'">
+        <label class="field-label mb-3 block">Devise du compte réel</label>
+        <div class="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            class="account-type-btn"
+            :class="{ 'balance-currency-active': form.balanceCurrency === 'usd' }"
+            @click="form.balanceCurrency = 'usd'"
+          >
+            <span class="text-sm font-semibold">Standard</span>
+            <span class="text-xs text-text-muted mt-1">USD</span>
+          </button>
+          <button
+            type="button"
+            class="account-type-btn"
+            :class="{ 'balance-currency-active': form.balanceCurrency === 'usc' }"
+            @click="form.balanceCurrency = 'usc'"
+          >
+            <span class="text-sm font-semibold">Cent</span>
+            <span class="text-xs text-text-muted mt-1">USC</span>
+          </button>
+        </div>
+        <p v-if="form.balanceCurrency === 'usc'" class="text-xs text-text-muted mt-2">
+          Les montants seront saisis en USC (1 USD = 100 USC). Une conversion USD reste disponible dans le tableau de bord.
+        </p>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -407,5 +462,10 @@ async function removeAccount(id) {
 .account-type-real-active {
   border-color: #34d39980 !important;
   background: var(--color-profit-soft) !important;
+}
+
+.balance-currency-active {
+  border-color: var(--color-accent) !important;
+  background: var(--color-accent-soft) !important;
 }
 </style>
