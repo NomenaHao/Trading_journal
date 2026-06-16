@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import db, { formatTrade, getActiveTradingAccountRow } from '../db.js';
 import { normalizeDecimalInput, parseDecimal } from '../utils/numbers.js';
+import { deleteTradeImages, resolveTradeImage } from '../utils/tradeImages.js';
 import { authRequired } from '../middleware/auth.js';
 
 const router = Router();
@@ -25,6 +26,12 @@ function parseTradePrices(body) {
   }
 
   return { entryPrice, takeProfit, stopLoss, profitLoss, positionCount };
+}
+
+function getTradeRow(userId, tradeId, accountId) {
+  return db
+    .prepare('SELECT * FROM trades WHERE id = ? AND user_id = ? AND trading_account_id = ?')
+    .get(tradeId, userId, accountId);
 }
 
 router.get('/', (req, res) => {
@@ -62,6 +69,8 @@ router.post('/', (req, res) => {
     notes,
     mood,
     closedAt,
+    beforeImage,
+    afterImage,
   } = req.body;
 
   if (
@@ -81,39 +90,58 @@ router.post('/', (req, res) => {
     return res.status(400).json({ error: 'Valeurs numériques invalides.' });
   }
 
-  const account = getActiveTradingAccountRow(req.user.userId);
+  const userId = req.user.userId;
+  const account = getActiveTradingAccountRow(userId);
 
-  const result = db.prepare(`
-    INSERT INTO trades (
-      user_id, trading_account_id, pair, entry_price, take_profit, stop_loss,
-      position_count, profit_loss, outcome, closed_at, notes, mood
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    req.user.userId,
-    account.id,
-    pair,
-    prices.entryPrice,
-    prices.takeProfit,
-    prices.stopLoss,
-    prices.positionCount,
-    prices.profitLoss,
-    outcome,
-    closedAt || new Date().toISOString(),
-    notes || '',
-    mood || ''
-  );
+  try {
+    const result = db.prepare(`
+      INSERT INTO trades (
+        user_id, trading_account_id, pair, entry_price, take_profit, stop_loss,
+        position_count, profit_loss, outcome, closed_at, notes, mood
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      userId,
+      account.id,
+      pair,
+      prices.entryPrice,
+      prices.takeProfit,
+      prices.stopLoss,
+      prices.positionCount,
+      prices.profitLoss,
+      outcome,
+      closedAt || new Date().toISOString(),
+      notes || '',
+      mood || ''
+    );
 
-  const row = db
-    .prepare('SELECT * FROM trades WHERE id = ? AND user_id = ?')
-    .get(result.lastInsertRowid, req.user.userId);
-  res.status(201).json(formatTrade(row));
+    const tradeId = result.lastInsertRowid;
+    const beforeUrl = resolveTradeImage(userId, tradeId, 'before', beforeImage || '', '');
+    const afterUrl = resolveTradeImage(userId, tradeId, 'after', afterImage || '', '');
+
+    if (beforeUrl || afterUrl) {
+      db.prepare(`
+        UPDATE trades SET before_image = ?, after_image = ? WHERE id = ?
+      `).run(beforeUrl, afterUrl, tradeId);
+    }
+
+    const row = db.prepare('SELECT * FROM trades WHERE id = ? AND user_id = ?').get(tradeId, userId);
+    res.status(201).json(formatTrade(row));
+  } catch (err) {
+    res.status(400).json({ error: err.message || 'Erreur lors de l\'enregistrement des images.' });
+  }
 });
 
 router.delete('/:id', (req, res) => {
-  const account = getActiveTradingAccountRow(req.user.userId);
+  const userId = req.user.userId;
+  const account = getActiveTradingAccountRow(userId);
+  const tradeId = Number(req.params.id);
+
+  deleteTradeImages(userId, tradeId);
+
   const result = db.prepare(`
     DELETE FROM trades WHERE id = ? AND user_id = ? AND trading_account_id = ?
-  `).run(req.params.id, req.user.userId, account.id);
+  `).run(tradeId, userId, account.id);
+
   if (result.changes === 0) {
     return res.status(404).json({ error: 'Trade introuvable.' });
   }
@@ -132,6 +160,8 @@ router.put('/:id', (req, res) => {
     notes,
     mood,
     closedAt,
+    beforeImage,
+    afterImage,
   } = req.body;
 
   if (
@@ -151,45 +181,69 @@ router.put('/:id', (req, res) => {
     return res.status(400).json({ error: 'Valeurs numériques invalides.' });
   }
 
-  const account = getActiveTradingAccountRow(req.user.userId);
+  const userId = req.user.userId;
+  const account = getActiveTradingAccountRow(userId);
+  const tradeId = Number(req.params.id);
+  const existing = getTradeRow(userId, tradeId, account.id);
 
-  const result = db.prepare(`
-    UPDATE trades SET
-      pair = ?,
-      entry_price = ?,
-      take_profit = ?,
-      stop_loss = ?,
-      position_count = ?,
-      profit_loss = ?,
-      outcome = ?,
-      closed_at = ?,
-      notes = ?,
-      mood = ?
-    WHERE id = ? AND user_id = ? AND trading_account_id = ?
-  `).run(
-    pair,
-    prices.entryPrice,
-    prices.takeProfit,
-    prices.stopLoss,
-    prices.positionCount,
-    prices.profitLoss,
-    outcome,
-    closedAt || new Date().toISOString(),
-    notes || '',
-    mood || '',
-    req.params.id,
-    req.user.userId,
-    account.id
-  );
-
-  if (result.changes === 0) {
+  if (!existing) {
     return res.status(404).json({ error: 'Trade introuvable.' });
   }
 
-  const row = db
-    .prepare('SELECT * FROM trades WHERE id = ? AND user_id = ?')
-    .get(req.params.id, req.user.userId);
-  res.json(formatTrade(row));
+  try {
+    const nextBefore = resolveTradeImage(
+      userId,
+      tradeId,
+      'before',
+      beforeImage,
+      existing.before_image
+    );
+    const nextAfter = resolveTradeImage(
+      userId,
+      tradeId,
+      'after',
+      afterImage,
+      existing.after_image
+    );
+
+    db.prepare(`
+      UPDATE trades SET
+        pair = ?,
+        entry_price = ?,
+        take_profit = ?,
+        stop_loss = ?,
+        position_count = ?,
+        profit_loss = ?,
+        outcome = ?,
+        closed_at = ?,
+        notes = ?,
+        mood = ?,
+        before_image = ?,
+        after_image = ?
+      WHERE id = ? AND user_id = ? AND trading_account_id = ?
+    `).run(
+      pair,
+      prices.entryPrice,
+      prices.takeProfit,
+      prices.stopLoss,
+      prices.positionCount,
+      prices.profitLoss,
+      outcome,
+      closedAt || new Date().toISOString(),
+      notes || '',
+      mood || '',
+      nextBefore,
+      nextAfter,
+      tradeId,
+      userId,
+      account.id
+    );
+
+    const row = db.prepare('SELECT * FROM trades WHERE id = ? AND user_id = ?').get(tradeId, userId);
+    res.json(formatTrade(row));
+  } catch (err) {
+    res.status(400).json({ error: err.message || 'Erreur lors de la mise à jour des images.' });
+  }
 });
 
 export default router;

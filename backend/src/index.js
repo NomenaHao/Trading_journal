@@ -12,13 +12,15 @@ import statsRouter from './routes/stats.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const avatarsDir = path.join(__dirname, '..', 'data', 'avatars');
+const tradeImagesDir = path.join(__dirname, '..', 'data', 'trade-images');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(cors());
-app.use(express.json({ limit: '3mb' }));
+app.use(express.json({ limit: '8mb' }));
 app.use('/api/uploads/avatars', express.static(avatarsDir));
+app.use('/api/uploads/trades', express.static(tradeImagesDir));
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });

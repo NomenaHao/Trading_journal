@@ -257,6 +257,20 @@ function migrateTradeMood() {
 
 migrateTradeMood();
 
+function migrateTradeImages() {
+  const cols = db.prepare('PRAGMA table_info(trades)').all();
+  if (!cols.some((c) => c.name === 'before_image')) {
+    db.exec(`ALTER TABLE trades ADD COLUMN before_image TEXT NOT NULL DEFAULT ''`);
+    console.log('Migration : image avant des trades ajoutée.');
+  }
+  if (!cols.some((c) => c.name === 'after_image')) {
+    db.exec(`ALTER TABLE trades ADD COLUMN after_image TEXT NOT NULL DEFAULT ''`);
+    console.log('Migration : image après des trades ajoutée.');
+  }
+}
+
+migrateTradeImages();
+
 function migrateToTradingAccounts() {
   const hasTable = db
     .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='trading_accounts'")
@@ -608,6 +622,8 @@ export function formatTrade(row) {
     closedAt: row.closed_at,
     notes: row.notes || '',
     mood: row.mood || '',
+    beforeImage: row.before_image || '',
+    afterImage: row.after_image || '',
   };
 }
 
