@@ -55,7 +55,7 @@ onUnmounted(() => {
           type="button"
           class="trade-image-btn"
           aria-label="Voir la capture avant"
-          @click="openLightbox(beforeImage, 'Avant')"
+           @click="openLightbox(beforeImage, '')"
         >
           <img :src="beforeImage" alt="" class="trade-image" />
           <span class="trade-image-overlay">
@@ -71,7 +71,7 @@ onUnmounted(() => {
           type="button"
           class="trade-image-btn"
           aria-label="Voir la capture après"
-          @click="openLightbox(afterImage, 'Après')"
+          @click="openLightbox(afterImage, '')"
         >
           <img :src="afterImage" alt="" class="trade-image" />
           <span class="trade-image-overlay">
