@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useTradesStore } from '../stores/trades'
 import { useSettingsStore } from '../stores/settings'
 import { currencyLabel, formatMoney } from '../utils/currency'
+import TradeImageSlot from '../components/TradeImageSlot.vue'
 
 const router = useRouter()
 const tradesStore = useTradesStore()
@@ -24,6 +25,8 @@ const form = ref({
 const warning = ref('')
 const saving = ref(false)
 const success = ref(false)
+const beforeImage = ref('')
+const afterImage = ref('')
 
 onMounted(async () => {
   await settingsStore.fetchSettings()
@@ -93,6 +96,8 @@ async function submit() {
       outcome: form.value.outcome,
       notes: form.value.notes,
       mood: form.value.mood,
+      beforeImage: beforeImage.value || undefined,
+      afterImage: afterImage.value || undefined,
     })
     success.value = true
     setTimeout(() => router.push('/journal'), 800)
@@ -206,6 +211,26 @@ function selectOutcome(outcome) {
           placeholder="ex: Confiant, stressé, calme…"
           maxlength="120"
         />
+      </div>
+
+      <div>
+        <label class="field-label mb-3 block">Captures (before / after)</label>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <TradeImageSlot
+            label="Avant"
+            optional
+            :preview="beforeImage"
+            @update="beforeImage = $event"
+            @remove="beforeImage = ''"
+          />
+          <TradeImageSlot
+            label="Après"
+            optional
+            :preview="afterImage"
+            @update="afterImage = $event"
+            @remove="afterImage = ''"
+          />
+        </div>
       </div>
 
       <div>

@@ -1,6 +1,7 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { currencyLabel } from '../utils/currency'
+import TradeImageSlot from './TradeImageSlot.vue'
 
 const props = defineProps({
   trade: { type: Object, required: true },
@@ -13,6 +14,10 @@ const emit = defineEmits(['close', 'save'])
 const form = ref(emptyForm())
 const warning = ref('')
 const saving = ref(false)
+const beforeImage = ref('')
+const afterImage = ref('')
+const beforeChanged = ref(false)
+const afterChanged = ref(false)
 
 function emptyForm() {
   return {
@@ -51,6 +56,10 @@ watch(
       mood: trade.mood || '',
       closedAt: toLocalDatetime(trade.closedAt),
     }
+    beforeImage.value = trade.beforeImage || ''
+    afterImage.value = trade.afterImage || ''
+    beforeChanged.value = false
+    afterChanged.value = false
     warning.value = ''
   },
   { immediate: true }
@@ -83,6 +92,26 @@ function selectOutcome(outcome) {
   validateCoherence()
 }
 
+function updateBeforeImage(value) {
+  beforeImage.value = value
+  beforeChanged.value = true
+}
+
+function removeBeforeImage() {
+  beforeImage.value = ''
+  beforeChanged.value = true
+}
+
+function updateAfterImage(value) {
+  afterImage.value = value
+  afterChanged.value = true
+}
+
+function removeAfterImage() {
+  afterImage.value = ''
+  afterChanged.value = true
+}
+
 async function submit() {
   validateCoherence()
   if (!form.value.outcome) {
@@ -103,6 +132,8 @@ async function submit() {
       notes: form.value.notes,
       mood: form.value.mood,
       closedAt: new Date(form.value.closedAt).toISOString(),
+      beforeImage: beforeChanged.value ? beforeImage.value : undefined,
+      afterImage: afterChanged.value ? afterImage.value : undefined,
     })
   } finally {
     saving.value = false
@@ -197,6 +228,26 @@ async function submit() {
             placeholder="ex: Confiant, stressé, calme…"
             maxlength="120"
           />
+        </div>
+
+        <div>
+          <label class="field-label mb-2 block">Captures (before / after)</label>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <TradeImageSlot
+              label="Avant"
+              optional
+              :preview="beforeImage"
+              @update="updateBeforeImage"
+              @remove="removeBeforeImage"
+            />
+            <TradeImageSlot
+              label="Après"
+              optional
+              :preview="afterImage"
+              @update="updateAfterImage"
+              @remove="removeAfterImage"
+            />
+          </div>
         </div>
 
         <div>

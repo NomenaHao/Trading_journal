@@ -6,6 +6,7 @@ import { useSettingsStore } from '../stores/settings'
 import OutcomeBadge from '../components/OutcomeBadge.vue'
 import PnlValue from '../components/PnlValue.vue'
 import TradeEditModal from '../components/TradeEditModal.vue'
+import TradeImagesDisplay from '../components/TradeImagesDisplay.vue'
 
 const tradesStore = useTradesStore()
 const settingsStore = useSettingsStore()
@@ -138,13 +139,20 @@ function formatDateShort(iso) {
             </div>
           </dl>
 
+          <TradeImagesDisplay
+            v-if="trade.beforeImage || trade.afterImage"
+            class="mb-4"
+            :before-image="trade.beforeImage"
+            :after-image="trade.afterImage"
+          />
+
           <div class="flex gap-2">
             <button type="button" class="action-btn flex-1" @click="openEdit(trade)">
               Modifier
             </button>
-            <button type="button" class="action-btn action-btn-danger flex-1" @click="removeTrade(trade.id)">
+            <!-- <button type="button" class="action-btn action-btn-danger flex-1" @click="removeTrade(trade.id)">
               Supprimer
-            </button>
+            </button> -->
           </div>
         </article>
       </div>
@@ -163,44 +171,51 @@ function formatDateShort(iso) {
                 <th class="px-4 lg:px-5 py-3 font-medium">Issue</th>
                 <th class="px-4 lg:px-5 py-3 font-medium">Humeur</th>
                 <th class="px-4 lg:px-5 py-3 font-medium">Notes</th>
+                <th class="px-4 lg:px-5 py-3 font-medium">Captures</th>
                 <th class="px-4 lg:px-5 py-3 font-medium text-right">P&L</th>
                 <th class="px-4 lg:px-5 py-3 font-medium text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
-              <tr
-                v-for="trade in tradesStore.trades"
-                :key="trade.id"
-                class="border-b border-border-subtle last:border-0 hover:bg-surface-overlay/50 transition-colors"
-              >
-                <td class="px-4 lg:px-5 py-4 text-text-muted whitespace-nowrap">{{ formatDate(trade.closedAt) }}</td>
-                <td class="px-4 lg:px-5 py-4 font-medium">{{ trade.pair }}</td>
-                <td class="px-4 lg:px-5 py-4 tabular-nums text-text-muted">{{ trade.entryPrice }}</td>
-                <td class="px-4 lg:px-5 py-4 tabular-nums text-text-muted text-xs">
-                  <span class="text-profit">{{ trade.takeProfit }}</span>
-                  /
-                  <span class="text-loss">{{ trade.stopLoss }}</span>
-                </td>
-                <td class="px-4 lg:px-5 py-4 tabular-nums">{{ trade.positionCount }}</td>
-                <td class="px-4 lg:px-5 py-4"><OutcomeBadge :outcome="trade.outcome" /></td>
-                <td class="px-4 lg:px-5 py-4 text-text-muted max-w-[12rem]">
-                  <span v-if="trade.mood" class="line-clamp-2" :title="trade.mood">{{ trade.mood }}</span>
-                  <span v-else class="text-text-muted/50">—</span>
-                </td>
-                <td class="px-4 lg:px-5 py-4 text-text-muted max-w-[14rem]">
-                  <span v-if="trade.notes" class="line-clamp-2 whitespace-pre-wrap" :title="trade.notes">{{ trade.notes }}</span>
-                  <span v-else class="text-text-muted/50">—</span>
-                </td>
-                <td class="px-4 lg:px-5 py-4 text-right">
-                  <PnlValue :value="trade.profitLoss" :currency="balanceCurrency" show-usd-equivalent />
-                </td>
-                <td class="px-4 lg:px-5 py-4">
-                  <div class="flex items-center justify-end gap-2">
-                    <button type="button" class="action-btn" @click="openEdit(trade)">Modifier</button>
-                    <!-- <button type="button" class="action-btn action-btn-danger" @click="removeTrade(trade.id)">Supprimer</button> -->
-                  </div>
-                </td>
-              </tr>
+              <template v-for="trade in tradesStore.trades" :key="trade.id">
+                <tr class="border-b border-border-subtle last:border-0 hover:bg-surface-overlay/50 transition-colors">
+                  <td class="px-4 lg:px-5 py-4 text-text-muted whitespace-nowrap">{{ formatDate(trade.closedAt) }}</td>
+                  <td class="px-4 lg:px-5 py-4 font-medium">{{ trade.pair }}</td>
+                  <td class="px-4 lg:px-5 py-4 tabular-nums text-text-muted">{{ trade.entryPrice }}</td>
+                  <td class="px-4 lg:px-5 py-4 tabular-nums text-text-muted text-xs">
+                    <span class="text-profit">{{ trade.takeProfit }}</span>
+                    /
+                    <span class="text-loss">{{ trade.stopLoss }}</span>
+                  </td>
+                  <td class="px-4 lg:px-5 py-4 tabular-nums">{{ trade.positionCount }}</td>
+                  <td class="px-4 lg:px-5 py-4"><OutcomeBadge :outcome="trade.outcome" /></td>
+                  <td class="px-4 lg:px-5 py-4 text-text-muted max-w-[12rem]">
+                    <span v-if="trade.mood" class="line-clamp-2" :title="trade.mood">{{ trade.mood }}</span>
+                    <span v-else class="text-text-muted/50">—</span>
+                  </td>
+                  <td class="px-4 lg:px-5 py-4 text-text-muted max-w-[14rem]">
+                    <span v-if="trade.notes" class="line-clamp-2 whitespace-pre-wrap" :title="trade.notes">{{ trade.notes }}</span>
+                    <span v-else class="text-text-muted/50">—</span>
+                  </td>
+                  <td class="px-4 lg:px-5 py-4">
+                    <TradeImagesDisplay
+                      v-if="trade.beforeImage || trade.afterImage"
+                      variant="inline"
+                      :before-image="trade.beforeImage"
+                      :after-image="trade.afterImage"
+                    />
+                    <span v-else class="text-text-muted/50">—</span>
+                  </td>
+                  <td class="px-4 lg:px-5 py-4 text-right">
+                    <PnlValue :value="trade.profitLoss" :currency="balanceCurrency" show-usd-equivalent />
+                  </td>
+                  <td class="px-4 lg:px-5 py-4">
+                    <div class="flex items-center justify-end gap-2">
+                      <button type="button" class="action-btn" @click="openEdit(trade)">Modifier</button>
+                    </div>
+                  </td>
+                </tr>
+              </template>
             </tbody>
           </table>
         </div>
