@@ -77,6 +77,97 @@ router.get('/by-pair', (req, res) => {
   res.json(result);
 });
 
+router.get('/calendar', (req, res) => {
+  const year = Number.parseInt(req.query.year, 10);
+  const month = Number.parseInt(req.query.month, 10);
+
+  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+    return res.status(400).json({ error: 'Paramètres year et month (1-12) requis.' });
+  }
+
+  const userId = req.user.userId;
+  const accountId = getAccountId(userId);
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 1);
+
+  const rows = db.prepare(`
+    SELECT * FROM trades
+    WHERE user_id = ? AND trading_account_id = ?
+      AND closed_at >= ? AND closed_at < ?
+    ORDER BY closed_at ASC
+  `).all(userId, accountId, startDate.toISOString(), endDate.toISOString());
+
+  const trades = rows.map(formatTrade);
+  const dayMap = new Map();
+
+  for (const trade of trades) {
+    const local = getTradeLocalParts(trade.closedAt);
+    if (local.year !== year || local.month !== month) continue;
+
+    const day = local.day;
+    if (!dayMap.has(day)) {
+      dayMap.set(day, {
+        day,
+        pnl: 0,
+        gainPnL: 0,
+        lossPnL: 0,
+        bePnL: 0,
+        trades: 0,
+        wins: 0,
+        losses: 0,
+        breakEvens: 0,
+      });
+    }
+    const entry = dayMap.get(day);
+    entry.pnl += trade.profitLoss;
+    entry.trades++;
+    if (trade.outcome === 'TP') {
+      entry.wins++;
+      entry.gainPnL += trade.profitLoss;
+    } else if (trade.outcome === 'SL') {
+      entry.losses++;
+      entry.lossPnL += trade.profitLoss;
+    } else {
+      entry.breakEvens++;
+      entry.bePnL += trade.profitLoss;
+    }
+  }
+
+  const days = Array.from(dayMap.values()).map((d) => ({
+    ...d,
+    pnl: round(d.pnl),
+    gainPnL: round(d.gainPnL),
+    lossPnL: round(d.lossPnL),
+    bePnL: round(d.bePnL),
+  }));
+
+  const totalPnL = round(days.reduce((sum, d) => sum + d.pnl, 0));
+  const wins = trades.filter((t) => t.outcome === 'TP').length;
+  const losses = trades.filter((t) => t.outcome === 'SL').length;
+  const winRate = wins + losses > 0 ? round((wins / (wins + losses)) * 100) : 0;
+
+  let bestDay = null;
+  let worstDay = null;
+  for (const d of days) {
+    if (!bestDay || d.pnl > bestDay.pnl) bestDay = { day: d.day, pnl: d.pnl };
+    if (!worstDay || d.pnl < worstDay.pnl) worstDay = { day: d.day, pnl: d.pnl };
+  }
+
+  res.json({
+    year,
+    month,
+    summary: {
+      totalPnL,
+      winRate,
+      bestDay,
+      worstDay,
+      tradingDays: days.length,
+      tradeCount: trades.length,
+    },
+    days,
+  });
+});
+
 router.get('/timeline', (req, res) => {
   const period = req.query.period || 'month';
   const userId = req.user.userId;
@@ -196,6 +287,15 @@ function getWeekStart(date) {
   d.setDate(d.getDate() - diff);
   d.setHours(0, 0, 0, 0);
   return d;
+}
+
+function getTradeLocalParts(isoDate) {
+  const date = new Date(isoDate);
+  return {
+    year: date.getFullYear(),
+    month: date.getMonth() + 1,
+    day: date.getDate(),
+  };
 }
 
 function round(n) {
