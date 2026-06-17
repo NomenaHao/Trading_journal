@@ -7,6 +7,7 @@ export const useTradesStore = defineStore('trades', () => {
   const performance = ref(null)
   const pairStats = ref([])
   const timeline = ref([])
+  const calendar = ref(null)
   const loading = ref(false)
   const error = ref(null)
 
@@ -63,11 +64,18 @@ export const useTradesStore = defineStore('trades', () => {
     return data
   }
 
+  async function fetchCalendar(year, month) {
+    const { data } = await api.get('/stats/calendar', { params: { year, month } })
+    calendar.value = data
+    return data
+  }
+
   return {
     trades,
     performance,
     pairStats,
     timeline,
+    calendar,
     loading,
     error,
     fetchTrades,
@@ -77,5 +85,6 @@ export const useTradesStore = defineStore('trades', () => {
     fetchPerformance,
     fetchPairStats,
     fetchTimeline,
+    fetchCalendar,
   }
 })

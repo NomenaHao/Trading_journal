@@ -5,6 +5,7 @@ import { useSettingsStore } from '../stores/settings'
 import PeriodTabs from '../components/PeriodTabs.vue'
 import StatCard from '../components/StatCard.vue'
 import TimelineChart from '../components/TimelineChart.vue'
+import PerformanceCalendar from '../components/PerformanceCalendar.vue'
 import AccountTypeBadge from '../components/AccountTypeBadge.vue'
 import { formatMoney, formatUsdEquivalent } from '../utils/currency'
 
@@ -211,6 +212,8 @@ const goalCardSub = computed(() => {
         <p v-else class="text-sm text-text-muted text-center py-8">Aucun trade enregistré.</p>
       </div>
     </div>
+
+    <PerformanceCalendar :currency="balanceCurrency" class="mb-6 sm:mb-8" />
   </div>
 </template>
 
