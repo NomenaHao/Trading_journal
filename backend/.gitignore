@@ -1,0 +1,9 @@
+node_modules/
+.env
+data/journal.db
+data/journal.db-wal
+data/journal.db-shm
+data/avatars/
+data/trade-images/
+data/store.json
+data/store.json.bak
